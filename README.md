@@ -1,8 +1,7 @@
-<<<<<<< HEAD
 rancher-cube-apiserver
 ========
 
-## ***FILL THIS OUT WITH A USEFUL DESCRIPTION OF THIS REPO***
+API server for RancherCUBE.
 
 ## Building
 
@@ -27,7 +26,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-=======
-# rancher-cube-apiserver
-RancherCube apiserver
->>>>>>> 6e2c81a3d31cf83364af2cdbe7c2119c8fc80904
