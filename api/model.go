@@ -1,8 +1,10 @@
 package api
 
 import (
-	"github.com/rancher/go-rancher/client"
 	"github.com/rancher/rancher-cube-apiserver/backend"
+
+	"github.com/rancher/go-rancher/client"
+	"k8s.io/api/core/v1"
 )
 
 type Server struct {
@@ -10,11 +12,18 @@ type Server struct {
 	c *backend.ClientGenerator
 }
 
-type Host struct {
+type Node struct {
 	client.Resource
 
-	UUID string
-	Name string
+	Node *v1.Node `json:"node"`
+}
+
+type Cluster struct {
+	client.Resource
+
+	Name              string                   `json:"name"`
+	Resources         *backend.ClusterResource `json:"resources"`
+	ComponentStatuses *v1.ComponentStatusList  `json:"componentStatuses"`
 }
 
 func NewServer(c *backend.ClientGenerator) *Server {
@@ -31,32 +40,74 @@ func NewSchema() *client.Schemas {
 	schemas.AddType("schema", client.Schema{})
 	schemas.AddType("error", client.ServerApiError{})
 
-	hostSchema(schemas.AddType("host", Host{}))
+	nodeSchema(schemas.AddType("node", Node{}))
+	clusterSchema(schemas.AddType("cluster", Cluster{}))
 
 	return schemas
 }
 
-func hostSchema(host *client.Schema) {
-	host.CollectionMethods = []string{"GET"}
-	host.ResourceMethods = []string{"GET"}
+func clusterSchema(cluster *client.Schema) {
+	cluster.CollectionMethods = []string{"GET"}
+	cluster.ResourceMethods = []string{"GET"}
+
+	cluster.ResourceFields["resources"] = client.Field{
+		Type:     "struct",
+		Nullable: true,
+	}
+	cluster.ResourceFields["componentStatuses"] = client.Field{
+		Type:     "struct",
+		Nullable: true,
+	}
 }
 
-func toHostResource(uuid, name string) *Host {
-	return &Host{
+func nodeSchema(node *client.Schema) {
+	node.CollectionMethods = []string{"GET"}
+	node.ResourceMethods = []string{"GET"}
+
+	node.ResourceFields["node"] = client.Field{
+		Type:     "struct",
+		Nullable: true,
+	}
+}
+
+func toNodeResource(node *v1.Node) *Node {
+	name := node.GetName()
+	if name == "" {
+		return nil
+	}
+	return &Node{
 		Resource: client.Resource{
-			Id:      name,
-			Type:    "host",
+			Id:      string(name),
+			Type:    "node",
 			Actions: map[string]string{},
 		},
-		Name: name,
-		UUID: uuid,
+		Node: node,
 	}
 }
 
-func toHostCollection(nodeMap map[string]string) *client.GenericCollection {
+func toNodeCollection(nodeList *v1.NodeList) *client.GenericCollection {
 	data := []interface{}{}
-	for uuid, name := range nodeMap {
-		data = append(data, toHostResource(uuid, name))
+	for _, node := range nodeList.Items {
+		data = append(data, toNodeResource(&node))
 	}
-	return &client.GenericCollection{Data: data}
+	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: "node"}}
+}
+
+func toClusterResource(clusterResource *backend.ClusterResource, componentStatuses *v1.ComponentStatusList) *Cluster {
+	return &Cluster{
+		Resource: client.Resource{
+			Id:      "cube",
+			Type:    "cluster",
+			Actions: map[string]string{},
+		},
+		Name:              "cube",
+		Resources:         clusterResource,
+		ComponentStatuses: componentStatuses,
+	}
+}
+
+func toClusterCollection(clusterResource *backend.ClusterResource, componentStatuses *v1.ComponentStatusList) *client.GenericCollection {
+	data := []interface{}{}
+	data = append(data, toClusterResource(clusterResource, componentStatuses))
+	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: "cluster"}}
 }

@@ -53,7 +53,9 @@ func NewRouter(s *Server) *mux.Router {
 	r.Methods("GET").Path("/v1/schemas").Handler(api.SchemasHandler(schemas))
 	r.Methods("GET").Path("/v1/schemas/{id}").Handler(api.SchemaHandler(schemas))
 
-	r.Methods("GET").Path("/v1/settings").Handler(f(schemas, s.NodeList))
+	r.Methods("GET").Path("/v1/nodes").Handler(f(schemas, s.NodeList))
+	r.Methods("GET").Path("/v1/nodes/{id}").Handler(f(schemas, s.NodeGet))
+	r.Methods("GET").Path("/v1/clusters").Handler(f(schemas, s.ClusterList))
 
 	return r
 }

@@ -11,3 +11,5 @@ var ListEverything = metaV1.ListOptions{
 	LabelSelector: labels.Everything().String(),
 	FieldSelector: fields.Everything().String(),
 }
+
+var GetOptions = metaV1.GetOptions{}

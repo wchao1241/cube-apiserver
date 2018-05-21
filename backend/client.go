@@ -18,18 +18,18 @@ func NewClientGenerator(kubeConfig string) *ClientGenerator {
 	if kubeConfig == "" {
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			logrus.Fatalf("RancherCUBE: generate config failed: %V", err)
+			logrus.Fatalf("RancherCUBE: generate config failed: %v", err)
 		}
 	}
 
 	config, err = clientcmd.BuildConfigFromFlags("", kubeConfig)
 	if err != nil {
-		logrus.Fatalf("RancherCUBE: generate config failed: %V", err)
+		logrus.Fatalf("RancherCUBE: generate config failed: %v", err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		logrus.Fatalf("RancherCUBE: generate clientset failed: %V", err)
+		logrus.Fatalf("RancherCUBE: generate clientset failed: %v", err)
 	}
 
 	return &ClientGenerator{
