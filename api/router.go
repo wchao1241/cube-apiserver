@@ -39,5 +39,19 @@ func HandleError(s *client.Schemas, t HandleFuncWithError) http.Handler {
 }
 
 func NewRouter(s *Server) *mux.Router {
-	return nil
+	schemas := NewSchema()
+	r := mux.NewRouter().StrictSlash(true)
+	//f := HandleError
+
+	versionsHandler := api.VersionsHandler(schemas, "v1")
+	versionHandler := api.VersionHandler(schemas, "v1")
+
+	r.Methods("GET").Path("/").Handler(versionsHandler)
+	r.Methods("GET").Path("/v1").Handler(versionHandler)
+	r.Methods("GET").Path("/v1/apiversions").Handler(versionsHandler)
+	r.Methods("GET").Path("/v1/apiversions/v1").Handler(versionHandler)
+	r.Methods("GET").Path("/v1/schemas").Handler(api.SchemasHandler(schemas))
+	r.Methods("GET").Path("/v1/schemas/{id}").Handler(api.SchemaHandler(schemas))
+
+	return r
 }
