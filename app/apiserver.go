@@ -8,11 +8,13 @@ import (
 	"github.com/rancher/rancher-cube-apiserver/util"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/rancher/rancher-cube-apiserver/backend"
 	"github.com/urfave/cli"
 )
 
 const (
-	FlagAPIServerImage = "apiserver-image"
+	ListenAddress      = "apiserver-listen-addr"
+	KubeConfigLocation = "apiserver-kubeconfig"
 )
 
 func APIServerCmd() cli.Command {
@@ -20,8 +22,12 @@ func APIServerCmd() cli.Command {
 		Name: "serve",
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  FlagAPIServerImage,
-				Usage: "Specify apiServer image",
+				Name:  ListenAddress,
+				Usage: "Specify apiServer listen address",
+			},
+			cli.StringFlag{
+				Name:  KubeConfigLocation,
+				Usage: "Specify apiServer kubernetes config location",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -35,21 +41,25 @@ func APIServerCmd() cli.Command {
 }
 
 func startAPIServer(c *cli.Context) error {
-	apiServerImage := c.String(FlagAPIServerImage)
-	if "" == apiServerImage {
-		return fmt.Errorf("RancherCUBE: require %v", FlagAPIServerImage)
+	apiServerListenAddr := c.String(ListenAddress)
+	apiServerKubeConfigLocation := c.String(KubeConfigLocation)
+	if "" == apiServerListenAddr {
+		return fmt.Errorf("RancherCUBE: require %v", ListenAddress)
 	}
+	if "" == apiServerKubeConfigLocation {
+		return fmt.Errorf("RancherCUBE: require %v", KubeConfigLocation)
+	}
+
+	clientGenerator := backend.NewClientGenerator(apiServerKubeConfigLocation)
 
 	done := make(chan struct{})
 
-	// TODO: define router...
-
-	server := api.NewServer()
+	server := api.NewServer(clientGenerator)
 	router := http.Handler(api.NewRouter(server))
 
-	logrus.Infof("RancherCUBE: listening on %s", "127.0.0.1:9500")
+	logrus.Infof("RancherCUBE: listening on %s", apiServerListenAddr)
 
-	go http.ListenAndServe(":9500", router)
+	go http.ListenAndServe(apiServerListenAddr, router)
 
 	util.RegisterShutdownChannel(done)
 	<-done
