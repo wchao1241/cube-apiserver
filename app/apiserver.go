@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	ListenAddress      = "apiserver-listen-addr"
-	KubeConfigLocation = "apiserver-kubeconfig"
+	ListenAddress  = "listen-addr"
+	ConfigLocation = "kube-config"
 )
 
 func APIServerCmd() cli.Command {
@@ -26,7 +26,7 @@ func APIServerCmd() cli.Command {
 				Usage: "Specify apiServer listen address",
 			},
 			cli.StringFlag{
-				Name:  KubeConfigLocation,
+				Name:  ConfigLocation,
 				Usage: "Specify apiServer kubernetes config location",
 			},
 		},
@@ -42,12 +42,12 @@ func APIServerCmd() cli.Command {
 
 func startAPIServer(c *cli.Context) error {
 	apiServerListenAddr := c.String(ListenAddress)
-	apiServerKubeConfigLocation := c.String(KubeConfigLocation)
+	apiServerKubeConfigLocation := c.String(ConfigLocation)
 	if "" == apiServerListenAddr {
 		return fmt.Errorf("RancherCUBE: require %v", ListenAddress)
 	}
 	if "" == apiServerKubeConfigLocation {
-		return fmt.Errorf("RancherCUBE: require %v", KubeConfigLocation)
+		return fmt.Errorf("RancherCUBE: require %v", ConfigLocation)
 	}
 
 	clientGenerator := backend.NewClientGenerator(apiServerKubeConfigLocation)
