@@ -52,6 +52,9 @@ func startAPIServer(c *cli.Context) error {
 
 	clientGenerator := backend.NewClientGenerator(apiServerKubeConfigLocation)
 
+	// generate & deploy infrastructure customer resources
+	clientGenerator.InfrastructureCRDDeploy()
+
 	done := make(chan struct{})
 
 	server := api.NewServer(clientGenerator)
