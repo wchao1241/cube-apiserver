@@ -373,7 +373,7 @@ func (c *InfraController) bundleCreate(infra *infrav1alpha1.Infrastructure) (*ap
 	case "Dashboard":
 		return c.createDashboard(infra)
 	case "Longhorn":
-		return c.createLoghorn(infra)
+		return c.createLonghorn(infra)
 	case "RancherVM":
 		return c.createRancherVM(infra)
 	}
@@ -387,7 +387,7 @@ func (c *InfraController) bundleUpdate(infra *infrav1alpha1.Infrastructure) (*ap
 	case "Dashboard":
 		return c.updateDashboard(infra)
 	case "Longhorn":
-		return c.updateLoghorn(infra)
+		return c.updateLonghorn(infra)
 	case "RancherVM":
 		return c.updateRancherVM(infra)
 	}
@@ -698,7 +698,7 @@ func (c *InfraController) createDashboard(infra *infrav1alpha1.Infrastructure) (
 	return nil, err
 }
 
-func (c *InfraController) createLoghorn(infra *infrav1alpha1.Infrastructure) (*appsv1.Deployment, error) {
+func (c *InfraController) createLonghorn(infra *infrav1alpha1.Infrastructure) (*appsv1.Deployment, error) {
 	return nil, nil
 }
 
@@ -816,7 +816,7 @@ func (c *InfraController) updateDashboard(infra *infrav1alpha1.Infrastructure) (
 	return nil, err
 }
 
-func (c *InfraController) updateLoghorn(infra *infrav1alpha1.Infrastructure) (*appsv1.Deployment, error) {
+func (c *InfraController) updateLonghorn(infra *infrav1alpha1.Infrastructure) (*appsv1.Deployment, error) {
 	return nil, nil
 }
 
