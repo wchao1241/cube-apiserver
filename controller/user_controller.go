@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	userv1alpha1 "github.com/cnrancher/cube-apiserver/k8s/pkg/apis/cube/v1alpha1"
@@ -10,9 +9,12 @@ import (
 	userscheme "github.com/cnrancher/cube-apiserver/k8s/pkg/client/clientset/versioned/scheme"
 	userinformers "github.com/cnrancher/cube-apiserver/k8s/pkg/client/informers/externalversions"
 	userlisters "github.com/cnrancher/cube-apiserver/k8s/pkg/client/listers/cube/v1alpha1"
+	"github.com/cnrancher/cube-apiserver/util"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -22,6 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	rbacv1lister "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -38,6 +41,14 @@ type UserController struct {
 	principalLister   userlisters.PrincipalLister
 	principalInformer cache.SharedIndexInformer
 	principalSynced   cache.InformerSynced
+
+	crbLister   rbacv1lister.ClusterRoleBindingLister
+	crbInformer cache.SharedIndexInformer
+	crbSynced   cache.InformerSynced
+
+	crLister   rbacv1lister.ClusterRoleLister
+	crInformer cache.SharedIndexInformer
+	crSynced   cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
@@ -61,9 +72,9 @@ func NewUserController(clientset kubernetes.Interface,
 
 	// add index for userInformer
 	userIndexers := map[string]cache.IndexFunc{
-		UserByPrincipalIndex: userByPrincipal,
-		UserByUsernameIndex:  userByUsername,
-		UserSearchIndex:      userSearchIndexer,
+		UserByPrincipalIndex: UserByPrincipal,
+		UserByUsernameIndex:  UserByUsername,
+		UserSearchIndex:      UserSearchIndexer,
 	}
 
 	if err := userInformer.Informer().AddIndexers(userIndexers); err != nil {
@@ -76,10 +87,36 @@ func NewUserController(clientset kubernetes.Interface,
 
 	// add index for userInformer
 	principalIndexers := map[string]cache.IndexFunc{
-		PrincipalByIdIndex: principalById,
+		PrincipalByIdIndex: PrincipalById,
 	}
 
 	if err := principalInformer.Informer().AddIndexers(principalIndexers); err != nil {
+		return nil
+	}
+
+	// obtain references to shared index informers for the ClusterRoleBinding
+	// types.
+	crbInformer := informerFactory.Rbac().V1().ClusterRoleBindings()
+
+	// add index for crbInformer
+	crbIndexers := map[string]cache.IndexFunc{
+		ClusterRoleBindingByNameIndex: ClusterRoleBindingByName,
+	}
+
+	if err := crbInformer.Informer().AddIndexers(crbIndexers); err != nil {
+		return nil
+	}
+
+	// obtain references to shared index informers for the ClusterRole
+	// types.
+	crInformer := informerFactory.Rbac().V1().ClusterRoles()
+
+	// add index for crInformer
+	crIndexers := map[string]cache.IndexFunc{
+		ClusterRoleByNameIndex: ClusterRoleByName,
+	}
+
+	if err := crInformer.Informer().AddIndexers(crIndexers); err != nil {
 		return nil
 	}
 
@@ -100,6 +137,12 @@ func NewUserController(clientset kubernetes.Interface,
 		principalLister:   principalInformer.Lister(),
 		principalInformer: principalInformer.Informer(),
 		principalSynced:   principalInformer.Informer().HasSynced,
+		crbLister:         crbInformer.Lister(),
+		crbInformer:       crbInformer.Informer(),
+		crbSynced:         crbInformer.Informer().HasSynced,
+		crLister:          crInformer.Lister(),
+		crInformer:        crInformer.Informer(),
+		crSynced:          crInformer.Informer().HasSynced,
 		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Users"),
 		recorder:          recorder,
 	}
@@ -113,12 +156,45 @@ func NewUserController(clientset kubernetes.Interface,
 		},
 	})
 
+	// Set up an event handler for when Principal resources change
 	principalInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.handleObject,
 		UpdateFunc: func(old, new interface{}) {
-			newDepl := new.(*userv1alpha1.Principal)
-			oldDepl := old.(*userv1alpha1.Principal)
-			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+			newPrincipal := new.(*userv1alpha1.Principal)
+			oldPrincipal := old.(*userv1alpha1.Principal)
+			if newPrincipal.ResourceVersion == oldPrincipal.ResourceVersion {
+				// Periodic resync will send update events for all known Deployments.
+				// Two different versions of the same Deployment will always have different RVs.
+				return
+			}
+			controller.handleObject(new)
+		},
+		DeleteFunc: controller.handleObject,
+	})
+
+	// Set up an event handler for when ClusterRoleBinding resources change
+	crbInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObject,
+		UpdateFunc: func(old, new interface{}) {
+			newCrb := new.(*rbacv1.ClusterRoleBinding)
+			oldCrb := old.(*rbacv1.ClusterRoleBinding)
+			if newCrb.ResourceVersion == oldCrb.ResourceVersion {
+				// Periodic resync will send update events for all known Deployments.
+				// Two different versions of the same Deployment will always have different RVs.
+				return
+			}
+			controller.handleObject(new)
+		},
+		DeleteFunc: controller.handleObject,
+	})
+
+	// Set up an event handler for when ClusterRole resources change
+	crInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObject,
+		UpdateFunc: func(old, new interface{}) {
+			newCr := new.(*rbacv1.ClusterRole)
+			oldCr := old.(*rbacv1.ClusterRole)
+			if newCr.ResourceVersion == oldCr.ResourceVersion {
 				// Periodic resync will send update events for all known Deployments.
 				// Two different versions of the same Deployment will always have different RVs.
 				return
@@ -144,7 +220,7 @@ func (c *UserController) Run(threadiness int, stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	glog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.userSynced, c.principalSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.userSynced, c.principalSynced, c.crbSynced, c.crSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -256,19 +332,25 @@ func (c *UserController) syncHandler(key string) error {
 		return nil
 	}
 
-	principalLogic := toPrincipal("user", user.DisplayName, user.Username, user.Namespace, getLocalPrincipalID(user), nil)
+	principalLogic := ToPrincipal("user", user.DisplayName, user.Username, user.Namespace, GetLocalPrincipalID(user), nil)
 
-	principal, err := c.principalLister.Principals(user.Namespace).Get(principalLogic.Name)
-
-	if k8serrors.IsNotFound(err) {
-		principal, err = c.bundleCreate(user, &principalLogic)
+	var principal *userv1alpha1.Principal
+	principals, _ := c.principalInformer.GetIndexer().ByIndex(PrincipalByIdIndex, principalLogic.Name)
+	if len(principals) <= 0 {
+		principal, err = c.createPrincipal(user, &principalLogic)
+		// If an error occurs during Get/Create, we'll requeue the item so we can
+		// attempt processing again later. This could have been caused by a
+		// temporary network failure, or any other transient reason.
+		if err != nil {
+			return err
+		}
 	}
-
-	// If an error occurs during Get/Create, we'll requeue the item so we can
-	// attempt processing again later. This could have been caused by a
-	// temporary network failure, or any other transient reason.
-	if err != nil {
-		return err
+	if len(principals) > 1 {
+		return errors.Errorf("can't find unique principal for user %v", userName)
+	}
+	if len(principals) == 1 {
+		u := principals[0].(*userv1alpha1.Principal)
+		principal = u.DeepCopy()
 	}
 
 	// If the Principal is not controlled by this User resource, we should log
@@ -284,7 +366,7 @@ func (c *UserController) syncHandler(key string) error {
 	// should update the Principal resource.
 	if !matchPrincipalId(user.PrincipalIDs, principal.Name) {
 		glog.V(4).Infof("User %s principalIds not contain principal id: %s", user.Name, principal.Name)
-		principal, err = c.bundleUpdate(user, principal)
+		principal, err = c.updatePrincipal(user, principal)
 	}
 
 	// If an error occurs during Update, we'll requeue the item so we can
@@ -292,6 +374,60 @@ func (c *UserController) syncHandler(key string) error {
 	// temporary network failure, or any other transient reason.
 	if err != nil {
 		return err
+	}
+
+	var clusterRole *rbacv1.ClusterRole
+	clusterRoles, _ := c.crInformer.GetIndexer().ByIndex(ClusterRoleByNameIndex, userName)
+	if len(clusterRoles) <= 0 {
+		clusterRole, err = c.generateClusterRole("admin", user)
+		// If an error occurs during Get/Create, we'll requeue the item so we can
+		// attempt processing again later. This could have been caused by a
+		// temporary network failure, or any other transient reason.
+		if err != nil {
+			return err
+		}
+	}
+	if len(clusterRoles) > 1 {
+		return errors.Errorf("can't find unique clusterRoles for user %v", userName)
+	}
+	if len(clusterRoles) == 1 {
+		u := clusterRoles[0].(*rbacv1.ClusterRole)
+		clusterRole = u.DeepCopy()
+	}
+
+	// If the ClusterRole is not controlled by this User resource, we should log
+	// a warning to the event recorder and ret
+	if !metav1.IsControlledBy(clusterRole, user) {
+		msg := fmt.Sprintf(UserMessageResourceExists, clusterRole)
+		c.recorder.Event(user, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf(msg)
+	}
+
+	var clusterRoleBinding *rbacv1.ClusterRoleBinding
+	clusterRoleBindings, _ := c.crbInformer.GetIndexer().ByIndex(ClusterRoleBindingByNameIndex, userName)
+	if len(clusterRoleBindings) <= 0 {
+		clusterRoleBinding, err = c.generateClusterRoleBinding(user)
+		// If an error occurs during Get/Create, we'll requeue the item so we can
+		// attempt processing again later. This could have been caused by a
+		// temporary network failure, or any other transient reason.
+		if err != nil {
+			return err
+		}
+	}
+	if len(clusterRoleBindings) > 1 {
+		return errors.Errorf("can't find unique clusterRoleBindings for user %v", userName)
+	}
+	if len(clusterRoleBindings) == 1 {
+		u := clusterRoleBindings[0].(*rbacv1.ClusterRoleBinding)
+		clusterRoleBinding = u.DeepCopy()
+	}
+
+	// If the ClusterRoleBinding is not controlled by this User resource, we should log
+	// a warning to the event recorder and ret
+	if !metav1.IsControlledBy(clusterRoleBinding, user) {
+		msg := fmt.Sprintf(UserMessageResourceExists, clusterRoleBinding)
+		c.recorder.Event(user, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf(msg)
 	}
 
 	// Finally, we update the status block of the User resource to reflect the
@@ -382,34 +518,38 @@ func (c *UserController) updateUser(user *userv1alpha1.User, principal *userv1al
 	return err
 }
 
-// bundleCreate will create all User needed such as(Principal, Rbac, Pv, Pvc, Deployment, etc...)
-func (c *UserController) bundleCreate(user *userv1alpha1.User, principleLogic *userv1alpha1.Principal) (*userv1alpha1.Principal, error) {
-	principleLogic.OwnerReferences = []metav1.OwnerReference{
-		*metav1.NewControllerRef(user, schema.GroupVersionKind{
-			Group:   userv1alpha1.SchemeGroupVersion.Group,
-			Version: userv1alpha1.SchemeGroupVersion.Version,
-			Kind:    "User",
-		}),
-	}
-	principal, err := c.userclientset.CubeV1alpha1().Principals(user.Namespace).Create(principleLogic)
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
-		return nil, err
+// createPrincipal will create principal associate to user
+func (c *UserController) createPrincipal(user *userv1alpha1.User, principalLogic *userv1alpha1.Principal) (*userv1alpha1.Principal, error) {
+	err := c.ensureNamespaceExists()
+	if err == nil || k8serrors.IsAlreadyExists(err) {
+		principalLogic.OwnerReferences = []metav1.OwnerReference{
+			*metav1.NewControllerRef(user, schema.GroupVersionKind{
+				Group:   userv1alpha1.SchemeGroupVersion.Group,
+				Version: userv1alpha1.SchemeGroupVersion.Version,
+				Kind:    "User",
+			}),
+		}
+		principal, err := c.userclientset.CubeV1alpha1().Principals(user.Namespace).Create(principalLogic)
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			return nil, err
+		}
+		return principal, nil
 	}
 
-	return principal, nil
+	return nil, err
 }
 
-// bundleUpdate will update all User needed such as(Principal, Rbac, Pv, Pvc, Deployment, etc...)
-func (c *UserController) bundleUpdate(user *userv1alpha1.User, principleLogic *userv1alpha1.Principal) (*userv1alpha1.Principal, error) {
-	principleLogic.OwnerReferences = []metav1.OwnerReference{
+// updatePrincipal will update principal associate to user
+func (c *UserController) updatePrincipal(user *userv1alpha1.User, principalLogic *userv1alpha1.Principal) (*userv1alpha1.Principal, error) {
+	principalLogic.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(user, schema.GroupVersionKind{
 			Group:   userv1alpha1.SchemeGroupVersion.Group,
 			Version: userv1alpha1.SchemeGroupVersion.Version,
 			Kind:    "User",
 		}),
 	}
-	principleLogic.Namespace = user.Namespace
-	principal, err := c.userclientset.CubeV1alpha1().Principals(user.Namespace).Update(principleLogic)
+	principalLogic.Namespace = user.Namespace
+	principal, err := c.userclientset.CubeV1alpha1().Principals(user.Namespace).Update(principalLogic)
 	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return nil, err
 	}
@@ -426,124 +566,101 @@ func (c *UserController) ensureNamespaceExists() error {
 	return err
 }
 
-func toPrincipal(principalType, displayName, loginName, namespace, id string, token *userv1alpha1.Token) userv1alpha1.Principal {
-	if displayName == "" {
-		displayName = loginName
-	}
-
-	princ := userv1alpha1.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: id, Namespace: namespace},
-		DisplayName: displayName,
-		LoginName:   loginName,
-		Provider:    "local",
-		Me:          false,
-	}
-
-	if principalType == "user" {
-		princ.PrincipalType = "user"
-		if token != nil {
-			princ.Me = isThisUserMe(token.UserPrincipal, princ)
+// generateClusterRole is used to generate cluster scope role for user
+// when add user, impersonate user need to update this workload
+// temporary only support all resources and verbs
+// TODO: it needs to be judged by the user role
+func (c *UserController) generateClusterRole(role string, user *userv1alpha1.User) (*rbacv1.ClusterRole, error) {
+	_, err := c.clientset.RbacV1().ClusterRoles().Get(user.Name, util.GetOptions)
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
+		cubeAdmin := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: user.Name,
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(user, schema.GroupVersionKind{
+						Group:   userv1alpha1.SchemeGroupVersion.Group,
+						Version: userv1alpha1.SchemeGroupVersion.Version,
+						Kind:    "User",
+					}),
+				},
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups:     []string{""},
+					Resources:     []string{"users"},
+					Verbs:         []string{"impersonate"},
+					ResourceNames: []string{user.Name},
+				},
+				{
+					APIGroups:     []string{""},
+					Resources:     []string{"groups"},
+					Verbs:         []string{"impersonate"},
+					ResourceNames: []string{"admin", "edit", "view"},
+				},
+				{
+					APIGroups:     []string{"authentication.k8s.io"},
+					Resources:     []string{"userextras/scopes"},
+					Verbs:         []string{"impersonate"},
+					ResourceNames: []string{""},
+				},
+				{
+					APIGroups:     []string{""},
+					Resources:     []string{"serviceaccounts"},
+					Verbs:         []string{"impersonate"},
+					ResourceNames: []string{""},
+				},
+			},
 		}
-	} else {
-		princ.PrincipalType = "group"
-		if token != nil {
-			princ.MemberOf = isMemberOf(token.GroupPrincipals, princ)
+		if role == "admin" {
+			cubeAdmin.Rules = append(cubeAdmin.Rules, rbacv1.PolicyRule{
+				APIGroups: []string{""},
+				Resources: util.AdminResources,
+				Verbs:     util.AdminVerbs,
+			})
 		}
-	}
-
-	return princ
-}
-
-func getLocalPrincipalID(user *userv1alpha1.User) string {
-	var principalID string
-	for _, p := range user.PrincipalIDs {
-		if strings.HasPrefix(p, "local.") {
-			principalID = p
-		}
-	}
-	if principalID == "" {
-		principalID = "local." + user.Namespace + "." + user.Name
-	}
-	return principalID
-}
-
-func isThisUserMe(me userv1alpha1.Principal, other userv1alpha1.Principal) bool {
-
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
-}
-
-func isMemberOf(myGroups []userv1alpha1.Principal, other userv1alpha1.Principal) bool {
-
-	for _, mygroup := range myGroups {
-		if mygroup.ObjectMeta.Name == other.ObjectMeta.Name && mygroup.PrincipalType == other.PrincipalType {
-			return true
-		}
-	}
-	return false
-}
-
-func userByPrincipal(obj interface{}) ([]string, error) {
-	u, ok := obj.(*userv1alpha1.User)
-	if !ok {
-		return []string{}, nil
-	}
-
-	return u.PrincipalIDs, nil
-}
-
-func userByUsername(obj interface{}) ([]string, error) {
-	user, ok := obj.(*userv1alpha1.User)
-	if !ok {
-		return []string{}, nil
-	}
-	return []string{user.Username}, nil
-}
-
-func userSearchIndexer(obj interface{}) ([]string, error) {
-	user, ok := obj.(*userv1alpha1.User)
-	if !ok {
-		return []string{}, nil
-	}
-	var fieldIndexes []string
-
-	fieldIndexes = append(fieldIndexes, indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
-
-	return fieldIndexes, nil
-}
-
-func principalById(obj interface{}) ([]string, error) {
-	principal, ok := obj.(*userv1alpha1.Principal)
-	if !ok {
-		return []string{}, nil
-	}
-	return []string{principal.Name}, nil
-}
-
-func minOf(length int, defaultLen int) int {
-	if length < defaultLen {
-		return length
-	}
-	return defaultLen
-}
-
-func indexField(field string, maxindex int) []string {
-	var fieldIndexes []string
-	for i := 2; i <= maxindex; i++ {
-		fieldIndexes = append(fieldIndexes, field[0:i])
-	}
-	return fieldIndexes
-}
-
-func matchPrincipalId(principalIds []string, id string) bool {
-	for _, val := range principalIds {
-		if val == id {
-			return true
+		clusterRole, err := c.clientset.RbacV1().ClusterRoles().Create(cubeAdmin)
+		if err == nil || k8serrors.IsAlreadyExists(err) {
+			return clusterRole, nil
 		}
 	}
-	return false
+
+	return nil, err
+}
+
+// generateClusterRoleBinding is used to generate cluster scope roleBinding for user
+// when add user, impersonate user need to update this workload
+func (c *UserController) generateClusterRoleBinding(user *userv1alpha1.User) (*rbacv1.ClusterRoleBinding, error) {
+	_, err := c.clientset.RbacV1().ClusterRoleBindings().Get(user.Name, util.GetOptions)
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
+		cubeAdmin := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: user.Name,
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(user, schema.GroupVersionKind{
+						Group:   userv1alpha1.SchemeGroupVersion.Group,
+						Version: userv1alpha1.SchemeGroupVersion.Version,
+						Kind:    "User",
+					}),
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				APIGroup: "rbac.authorization.k8s.io",
+				Name:     user.Name,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:     "User",
+					APIGroup: "rbac.authorization.k8s.io",
+					Name:     user.Name,
+				},
+			},
+		}
+
+		clusterRoleBinding, err := c.clientset.RbacV1().ClusterRoleBindings().Create(cubeAdmin)
+		if err == nil || k8serrors.IsAlreadyExists(err) {
+			return clusterRoleBinding, nil
+		}
+	}
+	return nil, err
 }
