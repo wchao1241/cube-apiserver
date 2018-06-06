@@ -11,7 +11,7 @@ import (
 	userlisters "github.com/cnrancher/cube-apiserver/k8s/pkg/client/listers/cube/v1alpha1"
 	"github.com/cnrancher/cube-apiserver/util"
 
-	"github.com/golang/glog"
+	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -105,7 +105,7 @@ func NewUserController(clientset kubernetes.Interface,
 
 	// add index for userInformer
 	principalIndexers := map[string]cache.IndexFunc{
-		PrincipalByIdIndex: PrincipalById,
+		PrincipalByIDIndex: PrincipalByID,
 	}
 
 	if err := principalInformer.Informer().AddIndexers(principalIndexers); err != nil {
@@ -140,9 +140,9 @@ func NewUserController(clientset kubernetes.Interface,
 
 	// Create event broadcaster
 	userscheme.AddToScheme(scheme.Scheme)
-	glog.V(4).Info("Creating event broadcaster")
+	logrus.Infof("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(logrus.Infof)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: UserControllerAgentName})
 
@@ -168,7 +168,7 @@ func NewUserController(clientset kubernetes.Interface,
 		recorder:          recorder,
 	}
 
-	glog.Info("Setting up event handlers")
+	logrus.Infof("Setting up event handlers")
 
 	// Set up an event handler for when User resources change
 	userInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -254,24 +254,24 @@ func (c *UserController) Run(threadiness int, stopCh <-chan struct{}) error {
 	defer c.workqueue.ShutDown()
 
 	// Start the informer factories to begin populating the informer caches
-	glog.Info("Starting User controller")
+	logrus.Infof("Starting User controller")
 
 	// Wait for the caches to be synced before starting workers
-	glog.Info("Waiting for informer caches to sync")
+	logrus.Infof("Waiting for informer caches to sync")
 	if ok := cache.WaitForCacheSync(stopCh, c.userSynced, c.tokenSynced, c.principalSynced, c.crbSynced, c.crSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	glog.Info("Starting workers")
+	logrus.Infof("Starting workers")
 	// Launch four workers to process User resources
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
-	glog.Info("Started workers")
+	logrus.Infof("Started workers")
 
 	<-stopCh
-	glog.Info("Shutting down workers")
+	logrus.Infof("Shutting down workers")
 
 	return nil
 }
@@ -325,7 +325,7 @@ func (c *UserController) processNextWorkItem() bool {
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queued again until another change happens.
 		c.workqueue.Forget(obj)
-		glog.Infof("Successfully synced '%s'", key)
+		logrus.Infof("Successfully synced '%s'", key)
 		return nil
 	}(obj)
 
@@ -373,7 +373,7 @@ func (c *UserController) syncHandler(key string) error {
 	principalLogic := ToPrincipal("user", user.DisplayName, user.Username, user.Namespace, GetLocalPrincipalID(user), nil)
 
 	var principal *userv1alpha1.Principal
-	principals, _ := c.principalInformer.GetIndexer().ByIndex(PrincipalByIdIndex, principalLogic.Name)
+	principals, _ := c.principalInformer.GetIndexer().ByIndex(PrincipalByIDIndex, principalLogic.Name)
 	if len(principals) <= 0 {
 		principal, err = c.createPrincipal(user, &principalLogic)
 		// If an error occurs during Get/Create, we'll requeue the item so we can
@@ -402,8 +402,8 @@ func (c *UserController) syncHandler(key string) error {
 	// If this number of the replicas on the User resource is specified, and the
 	// number does not equal the current desired replicas on the Principal, we
 	// should update the Principal resource.
-	if !matchPrincipalId(user.PrincipalIDs, principal.Name) {
-		glog.V(4).Infof("User %s principalIds not contain principal id: %s", user.Name, principal.Name)
+	if !matchPrincipalID(user.PrincipalIDs, principal.Name) {
+		logrus.Infof("User %s principalIds not contain principal id: %s", user.Name, principal.Name)
 		principal, err = c.updatePrincipal(user, principal)
 	}
 
@@ -511,9 +511,9 @@ func (c *UserController) handleObject(obj interface{}) {
 			runtime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
 			return
 		}
-		glog.V(4).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
+		logrus.Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 	}
-	glog.V(4).Infof("Processing object: %s", object.GetName())
+	logrus.Infof("Processing object: %s", object.GetName())
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		// If this object is not owned by a User, we should not do anything more
 		// with it.
@@ -523,7 +523,7 @@ func (c *UserController) handleObject(obj interface{}) {
 
 		user, err := c.userLister.Users(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
-			glog.V(4).Infof("ignoring orphaned object '%s' of user '%s'", object.GetSelfLink(), ownerRef.Name)
+			logrus.Infof("ignoring orphaned object '%s' of user '%s'", object.GetSelfLink(), ownerRef.Name)
 			return
 		}
 

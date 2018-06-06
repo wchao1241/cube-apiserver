@@ -3,9 +3,9 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	infrav1alpha1 "github.com/cnrancher/cube-apiserver/k8s/pkg/apis/cube/v1alpha1"
 	infraclientset "github.com/cnrancher/cube-apiserver/k8s/pkg/client/clientset/versioned"
 	infrascheme "github.com/cnrancher/cube-apiserver/k8s/pkg/client/clientset/versioned/scheme"
@@ -63,9 +63,9 @@ func NewInfraController(
 
 	// Create event broadcaster
 	infrascheme.AddToScheme(scheme.Scheme)
-	glog.V(4).Info("Creating event broadcaster")
+	logrus.Infof("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(logrus.Infof)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: InfraControllerAgentName})
 
@@ -79,7 +79,7 @@ func NewInfraController(
 		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Infrastructures"),
 		recorder:          recorder,
 	}
-	glog.Info("Setting up event handlers")
+	logrus.Infof("Setting up event handlers")
 
 	// Set up an event handler for when Infrastructure resources change
 	infraInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -123,23 +123,23 @@ func (c *InfraController) Run(threadiness int, stopCh <-chan struct{}) error {
 	defer c.workqueue.ShutDown()
 
 	// Start the informer factories to begin populating the informer caches
-	glog.Info("Starting Infrastructure controller")
+	logrus.Infof("Starting Infrastructure controller")
 
 	// Wait for the caches to be synced before starting workers
-	glog.Info("Waiting for informer caches to sync")
+	logrus.Infof("Waiting for informer caches to sync")
 	if ok := cache.WaitForCacheSync(stopCh, c.deploymentsSynced, c.infraSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	glog.Info("Starting workers")
+	logrus.Infof("Starting workers")
 	// Launch four workers to process Infrastructure resources
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
-	glog.Info("Started workers")
+	logrus.Infof("Started workers")
 	<-stopCh
-	glog.Info("Shutting down workers")
+	logrus.Infof("Shutting down workers")
 
 	return nil
 }
@@ -193,7 +193,7 @@ func (c *InfraController) processNextWorkItem() bool {
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queued again until another change happens.
 		c.workqueue.Forget(obj)
-		glog.Infof("Successfully synced '%s'", key)
+		logrus.Infof("Successfully synced '%s'", key)
 		return nil
 	}(obj)
 
@@ -264,7 +264,7 @@ func (c *InfraController) syncHandler(key string) error {
 	// number does not equal the current desired replicas on the Deployment, we
 	// should update the Deployment resource.
 	if infra.Spec.Replicas != nil && *infra.Spec.Replicas != *deployment.Spec.Replicas {
-		glog.V(4).Infof("Infrastructure %s replicas: %d, deployment replicas: %d", name, *infra.Spec.Replicas, *deployment.Spec.Replicas)
+		logrus.Infof("Infrastructure %s replicas: %d, deployment replicas: %d", name, *infra.Spec.Replicas, *deployment.Spec.Replicas)
 		deployment, err = c.bundleUpdate(infra)
 	}
 
@@ -345,9 +345,9 @@ func (c *InfraController) handleObject(obj interface{}) {
 			runtime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
 			return
 		}
-		glog.V(4).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
+		logrus.Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 	}
-	glog.V(4).Infof("Processing object: %s", object.GetName())
+	logrus.Infof("Processing object: %s", object.GetName())
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		// If this object is not owned by a Infrastructure, we should not do anything more
 		// with it.
@@ -357,7 +357,7 @@ func (c *InfraController) handleObject(obj interface{}) {
 
 		infra, err := c.infraLister.Infrastructures(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
-			glog.V(4).Infof("ignoring orphaned object '%s' of infrastructure '%s'", object.GetSelfLink(), ownerRef.Name)
+			logrus.Infof("ignoring orphaned object '%s' of infrastructure '%s'", object.GetSelfLink(), ownerRef.Name)
 			return
 		}
 

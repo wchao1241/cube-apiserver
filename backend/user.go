@@ -201,10 +201,10 @@ func (c *ClientGenerator) CheckUserCache(principalName string) (*v1alpha1.User, 
 
 func (c *ClientGenerator) CheckPrincipalCache(principalName string) (*v1alpha1.Principal, error) {
 	informer := c.CubeInformerFactory.Cube().V1alpha1().Principals().Informer()
-	indexers := map[string]cache.IndexFunc{controller.PrincipalByIdIndex: controller.PrincipalById}
+	indexers := map[string]cache.IndexFunc{controller.PrincipalByIDIndex: controller.PrincipalByID}
 	informer.AddIndexers(indexers)
 
-	principals, err := informer.GetIndexer().ByIndex(controller.PrincipalByIdIndex, principalName)
+	principals, err := informer.GetIndexer().ByIndex(controller.PrincipalByIDIndex, principalName)
 	if err != nil {
 		return &v1alpha1.Principal{}, err
 	}

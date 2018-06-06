@@ -16,7 +16,7 @@ import (
 func (s *Server) Login(w http.ResponseWriter, req *http.Request) error {
 	token, responseType, err := unsecure.CreateLoginToken(s.c, JwtSignKey, req)
 	if err != nil {
-		util.JsonErrorResponse(err, http.StatusUnauthorized, w)
+		util.JSONErrorResponse(err, http.StatusUnauthorized, w)
 		return err
 	}
 
@@ -36,7 +36,7 @@ func (s *Server) Login(w http.ResponseWriter, req *http.Request) error {
 		http.SetCookie(w, tokenCookie)
 	} else {
 		token.Token = token.ObjectMeta.Name + ":" + token.Token
-		util.JsonResponse(token, http.StatusCreated, w)
+		util.JSONResponse(token, http.StatusCreated, w)
 	}
 
 	return nil
@@ -47,7 +47,7 @@ func (s *Server) Logout(w http.ResponseWriter, req *http.Request) error {
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate
 		err := errors.Errorf("RancherCUBE: no valid token cookie or auth header")
-		util.JsonErrorResponse(err, http.StatusUnauthorized, w)
+		util.JSONErrorResponse(err, http.StatusUnauthorized, w)
 		return err
 	}
 
@@ -75,10 +75,9 @@ func (s *Server) Logout(w http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		if statusCode == 404 {
 			return nil
-		} else {
-			logrus.Errorf("RancherCUBE: %v", err)
-			return err
 		}
+		logrus.Errorf("RancherCUBE: %v", err)
+		return err
 	}
 
 	err = common.DeleteToken(*storedToken, storedToken.AuthProvider)

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
 
@@ -22,7 +21,6 @@ const (
 )
 
 func APIServerCmd() cli.Command {
-	flag.Parse()
 	return cli.Command{
 		Name: "serve",
 		Flags: []cli.Flag{
@@ -84,7 +82,7 @@ func startAPIServer(c *cli.Context) error {
 		}
 	}()
 
-	server := api.NewServer(clientGenerator)
+	server := api.NewServer(clientGenerator, apiServerKubeConfigLocation)
 	router := http.Handler(api.NewRouter(server))
 
 	logrus.Infof("RancherCUBE: listening on %s", apiServerListenAddr)
