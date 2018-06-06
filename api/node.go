@@ -27,13 +27,13 @@ func (s *Server) NodeList(w http.ResponseWriter, req *http.Request) error {
 
 func (s *Server) NodeGet(w http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	nodeId := mux.Vars(req)["id"]
+	nodeID := mux.Vars(req)["id"]
 
 	impersonateUser := req.Header.Get("Impersonate-User")
 
 	c := backend.NewImpersonateGenerator(KubeConfigLocation, impersonateUser)
 
-	node, err := c.ClusterNode(nodeId)
+	node, err := c.ClusterNode(nodeID)
 	if err != nil || node == nil {
 		return errors.Wrap(err, "RancherCUBE: fail to read node")
 	}

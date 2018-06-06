@@ -36,7 +36,7 @@ func RegisterShutdownChannel(done chan struct{}) {
 	}()
 }
 
-func JsonErrorResponse(err error, statusCode int, w http.ResponseWriter) {
+func JSONErrorResponse(err error, statusCode int, w http.ResponseWriter) {
 	response := map[string]string{
 		"msg": err.Error(),
 	}
@@ -51,7 +51,7 @@ func JsonErrorResponse(err error, statusCode int, w http.ResponseWriter) {
 	w.Write(json)
 }
 
-func JsonResponse(response interface{}, statusCode int, w http.ResponseWriter) {
+func JSONResponse(response interface{}, statusCode int, w http.ResponseWriter) {
 	json, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

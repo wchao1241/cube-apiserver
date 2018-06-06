@@ -26,7 +26,7 @@ const (
 	UserByPrincipalIndex          = "auth.user.cube.rancher.io/user-principal-index"
 	UserByUsernameIndex           = "auth.user.cube.rancher.io/user-username-index"
 	UserSearchIndex               = "auth.user.cube.rancher.io/user-search-index"
-	PrincipalByIdIndex            = "auth.user.cube.rancher.io/principal-id-index"
+	PrincipalByIDIndex            = "auth.user.cube.rancher.io/principal-id-index"
 	TokenByNameIndex              = "auth.user.cube.rancher.io/token-name-index"
 	TokenByKeyIndex               = "auth.user.cube.rancher.io/token-key-index"
 	UserIDLabel                   = "auth.user.cube.rancher.io/token-user-id"
@@ -78,7 +78,7 @@ func UserSearchIndexer(obj interface{}) ([]string, error) {
 	return fieldIndexes, nil
 }
 
-func PrincipalById(obj interface{}) ([]string, error) {
+func PrincipalByID(obj interface{}) ([]string, error) {
 	principal, ok := obj.(*userv1alpha1.Principal)
 	if !ok {
 		return []string{}, nil
@@ -179,7 +179,7 @@ func indexField(field string, maxindex int) []string {
 	return fieldIndexes
 }
 
-func matchPrincipalId(principalIds []string, id string) bool {
+func matchPrincipalID(principalIds []string, id string) bool {
 	for _, val := range principalIds {
 		if val == id {
 			return true

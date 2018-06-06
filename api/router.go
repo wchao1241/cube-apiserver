@@ -96,7 +96,7 @@ func TokenObtainMiddleware(w http.ResponseWriter, r *http.Request, next http.Han
 	if tokenAuthValue != "" && next != nil {
 		storedToken, statusCode, err := clientGenerator.GetStoredToken(tokenAuthValue)
 		if err != nil && statusCode != 0 {
-			util.JsonErrorResponse(err, statusCode, w)
+			util.JSONErrorResponse(err, statusCode, w)
 			return
 		}
 
@@ -105,7 +105,7 @@ func TokenObtainMiddleware(w http.ResponseWriter, r *http.Request, next http.Han
 
 		next(w, r)
 	} else {
-		util.JsonErrorResponse(errors.New("RancherCUBE: couldn't get token auth form request"), http.StatusNotFound, w)
+		util.JSONErrorResponse(errors.New("RancherCUBE: couldn't get token auth form request"), http.StatusNotFound, w)
 	}
 }
 
