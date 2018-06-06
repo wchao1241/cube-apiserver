@@ -2,6 +2,7 @@ package util
 
 import (
 	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"encoding/base64"
 
 	"github.com/cnrancher/cube-apiserver/k8s/pkg/apis/cube/v1alpha1"
 

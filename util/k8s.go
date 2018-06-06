@@ -18,3 +18,5 @@ var ListEverything = metaV1.ListOptions{
 }
 
 var GetOptions = metaV1.GetOptions{}
+
+var DeleteOptions = metaV1.DeleteOptions{}

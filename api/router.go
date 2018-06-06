@@ -94,38 +94,9 @@ func TokenObtainMiddleware(w http.ResponseWriter, r *http.Request, next http.Han
 
 	// If there was an error, do not call next.
 	if tokenAuthValue != "" && next != nil {
-		tokenName, tokenKey := util.SplitTokenParts(tokenAuthValue)
-		if tokenName == "" || tokenKey == "" {
-			util.JsonErrorResponse(errors.New("RancherCUBE: couldn't split token"), http.StatusUnauthorized, w)
-			return
-		}
-
-		storedToken, err := clientGenerator.CheckTokenCache(tokenKey)
-		useTokenClient := false
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				useTokenClient = true
-			} else {
-				util.JsonErrorResponse(errors.New("RancherCUBE: couldn't found stored token"), http.StatusUnauthorized, w)
-				return
-			}
-		}
-
-		if useTokenClient {
-			storedToken, err = clientGenerator.Infraclientset.CubeV1alpha1().Tokens("").Get(tokenName, util.GetOptions)
-			if err != nil {
-				util.JsonErrorResponse(errors.New("RancherCUBE: couldn't found stored token"), http.StatusUnauthorized, w)
-				return
-			}
-		}
-
-		if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
-			util.JsonErrorResponse(errors.New("RancherCUBE: stored token not match request token"), http.StatusUnauthorized, w)
-			return
-		}
-
-		if util.IsExpired(*storedToken) {
-			util.JsonErrorResponse(errors.New("RancherCUBE: stored token is expired"), http.StatusUnauthorized, w)
+		storedToken, statusCode, err := clientGenerator.GetStoredToken(tokenAuthValue)
+		if err != nil && statusCode != 0 {
+			util.JsonErrorResponse(err, statusCode, w)
 			return
 		}
 
@@ -133,6 +104,8 @@ func TokenObtainMiddleware(w http.ResponseWriter, r *http.Request, next http.Han
 		// TODO: impersonate user header
 
 		next(w, r)
+	} else {
+		util.JsonErrorResponse(errors.New("RancherCUBE: couldn't get token auth form request"), http.StatusNotFound, w)
 	}
 }
 
