@@ -7,6 +7,8 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+var KubeConfigLocation string
+
 type Server struct {
 	// TODO: HTTP reverse proxy should be here
 	c *backend.ClientGenerator
@@ -33,7 +35,8 @@ type Token struct {
 	Token     string `json:"token"`
 }
 
-func NewServer(c *backend.ClientGenerator) *Server {
+func NewServer(c *backend.ClientGenerator, kubeConfig string) *Server {
+	KubeConfigLocation = kubeConfig
 	s := &Server{
 		c: c,
 	}

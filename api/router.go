@@ -101,7 +101,7 @@ func TokenObtainMiddleware(w http.ResponseWriter, r *http.Request, next http.Han
 		}
 
 		r.Header.Set("Authorization", "Bearer "+storedToken.Token)
-		// TODO: impersonate user header
+		r.Header.Set("Impersonate-User", storedToken.UserID)
 
 		next(w, r)
 	} else {
