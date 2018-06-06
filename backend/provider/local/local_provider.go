@@ -11,6 +11,7 @@ import (
 	v1alpha1lister "github.com/cnrancher/cube-apiserver/k8s/pkg/client/listers/cube/v1alpha1"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/cnrancher/cube-apiserver/util"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -171,6 +172,10 @@ func (p *Provider) GenerateToken(namespace string, token v1alpha1.Token, provide
 	}
 
 	return createdToken, nil
+}
+
+func (p *Provider) DeleteToken(token v1alpha1.Token, providerName string) error {
+	return p.clientGenerator.Infraclientset.CubeV1alpha1().Tokens(token.Namespace).Delete(token.Name, &util.DeleteOptions)
 }
 
 func (p *Provider) listAllUsers(searchKey string) ([]*v1alpha1.User, error) {

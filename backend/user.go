@@ -8,6 +8,7 @@ import (
 	"github.com/cnrancher/cube-apiserver/k8s/pkg/apis/cube/v1alpha1"
 	"github.com/cnrancher/cube-apiserver/util"
 
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -234,6 +235,39 @@ func (c *ClientGenerator) CheckTokenCache(token string) (*v1alpha1.Token, error)
 		return u.DeepCopy(), nil
 	}
 	return &v1alpha1.Token{}, nil
+}
+
+func (c *ClientGenerator) GetStoredToken(tokenAuthValue string) (*v1alpha1.Token, int, error) {
+	tokenName, tokenKey := util.SplitTokenParts(tokenAuthValue)
+	if tokenName == "" || tokenKey == "" {
+		return nil, 404, fmt.Errorf("RancherCUBE: faild to split token")
+	}
+
+	storedToken, err := clientGenerator.CheckTokenCache(tokenKey)
+	useTokenClient := false
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			useTokenClient = true
+		} else {
+			return nil, 404, fmt.Errorf("RancherCUBE: couldn't found stored token")
+		}
+	}
+
+	if useTokenClient {
+		storedToken, err = clientGenerator.Infraclientset.CubeV1alpha1().Tokens("").Get(tokenName, util.GetOptions)
+		if err != nil {
+			return nil, 404, fmt.Errorf("RancherCUBE: couldn't found stored token")
+		}
+	}
+
+	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
+		return nil, 401, fmt.Errorf("RancherCUBE: stored token not match request token")
+	}
+
+	if util.IsExpired(*storedToken) {
+		return nil, 410, fmt.Errorf("RancherCUBE: stored token is expired")
+	}
+	return storedToken, 0, nil
 }
 
 func (c *ClientGenerator) checkLabels(principalName string) (*v1alpha1.User, labels.Set, error) {

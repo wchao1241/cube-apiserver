@@ -73,3 +73,7 @@ func SearchPrincipals(name, principalType string, myToken v1alpha1.Token) ([]v1a
 func GenerateToken(namespace string, token v1alpha1.Token, providerName string) (*v1alpha1.Token, error) {
 	return providers[providerName].GenerateToken(namespace, token, providerName)
 }
+
+func DeleteToken(token v1alpha1.Token, providerName string) error {
+	return providers[providerName].DeleteToken(token, providerName)
+}

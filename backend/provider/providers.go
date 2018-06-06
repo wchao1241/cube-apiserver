@@ -23,4 +23,5 @@ type AuthProvider interface {
 	SearchPrincipals(name, principalType string, myToken v1alpha1.Token) ([]v1alpha1.Principal, error)
 	GetPrincipal(principalID string, token v1alpha1.Token) (v1alpha1.Principal, error)
 	GenerateToken(namespace string, token v1alpha1.Token, providerName string) (*v1alpha1.Token, error)
+	DeleteToken(token v1alpha1.Token, providerName string) error
 }
