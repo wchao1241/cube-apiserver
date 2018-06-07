@@ -89,6 +89,8 @@ func startAPIServer(c *cli.Context) error {
 
 	go http.ListenAndServe(apiServerListenAddr, router)
 
+	go StartPurgeDaemon(clientGenerator, done)
+
 	util.RegisterShutdownChannel(done)
 	<-done
 
