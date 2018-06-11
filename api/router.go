@@ -129,6 +129,13 @@ func NewRouter(s *Server) *mux.Router {
 	apiRouter.Methods("GET").Path("/nodes/{id}").Handler(f(schemas, s.NodeGet))
 	apiRouter.Methods("GET").Path("/clusters").Handler(f(schemas, s.ClusterList))
 
+	apiRouter.Methods("GET").Path("/baseinfos").Handler(f(schemas, s.BaseInfoGet))
+
+	apiRouter.Methods("GET").Path("/infrastructures").Handler(f(schemas, s.InfrastructureList))
+	apiRouter.Methods("GET").Path("/infrastructures/{id}").Handler(f(schemas, s.InfrastructureGet))
+	apiRouter.Methods("POST").Path("/infrastructures/{id}").Handler(f(schemas, s.InfrastructureCreate))
+	apiRouter.Methods("DELETE").Path("/infrastructures/{id}").Handler(f(schemas, s.InfrastructureDelete))
+
 	inSecureRouter.Methods("POST").Path("/login").HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		s.Login(w, req)
 	})
@@ -142,31 +149,17 @@ func NewRouter(s *Server) *mux.Router {
 		negroni.NewLogger(),
 	)
 
-	//jwtMiddleware := generatePrivateKey()
+	jwtMiddleware := generatePrivateKey()
 
 	router.PathPrefix("/v1").Handler(commonMiddleware.With(
-		//negroni.HandlerFunc(TokenObtainMiddleware),
-		//negroni.HandlerFunc(jwtMiddleware.HandlerWithNext),
+		negroni.HandlerFunc(TokenObtainMiddleware),
+		negroni.HandlerFunc(jwtMiddleware.HandlerWithNext),
 		negroni.Wrap(apiRouter),
 	))
 
 	router.PathPrefix("/").Handler(commonMiddleware.With(
 		negroni.Wrap(inSecureRouter),
 	))
-
-	apiRouter.Methods("GET").Path("/baseinfos").Handler(f(schemas, s.BaseInfoGet))
-	//apiRouter.Methods("GET").Path("/configmaps").Handler(f(schemas, s.BaseInfoGet))
-	//r.Methods("GET").Path("/v1/namespaces/{ns}/configmaps/{id}").Handler(f(schemas, s.BaseInfoGet))
-
-	apiRouter.Methods("GET").Path("/dashboards").Handler(f(schemas, s.DashboardList))
-	apiRouter.Methods("GET").Path("/dashboards/{id}").Handler(f(schemas, s.DashboardGet))
-	apiRouter.Methods("POST").Path("/dashboards").Handler(f(schemas, s.DashboardCreate))
-	apiRouter.Methods("DELETE").Path("/dashboards/{id}").Handler(f(schemas, s.DashboardDelete))
-
-	apiRouter.Methods("GET").Path("/longhorns").Handler(f(schemas, s.LonghornList))
-	apiRouter.Methods("GET").Path("/longhorns/{id}").Handler(f(schemas, s.LonghornGet))
-	apiRouter.Methods("POST").Path("/longhorns").Handler(f(schemas, s.LonghornCreate))
-	apiRouter.Methods("DELETE").Path("/longhorns/{id}").Handler(f(schemas, s.LonghornDelete))
 
 	return router
 }

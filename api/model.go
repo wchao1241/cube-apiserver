@@ -14,19 +14,23 @@ var KubeConfigLocation string
 var sType *schemaType
 
 type schemaType struct {
-	Configmap string
-	Dashboard string
-	Longhorn  string
-	BaseInfo  string
+	Configmap      string
+	Dashboard      string
+	Longhorn       string
+	BaseInfo       string
+	RancherVM      string
+	Infrastructure string
 }
 
 func GetSchemaType() *schemaType {
 	if sType == nil {
 		sType = &schemaType{
-			Configmap: "configmap",
-			Dashboard: "dashboard",
-			Longhorn:  "longhorn",
-			BaseInfo:  "baseinfo",
+			Configmap:      "configmap",
+			Dashboard:      "dashboard",
+			Longhorn:       "longhorn",
+			BaseInfo:       "baseinfo",
+			RancherVM:      "ranchervm",
+			Infrastructure: "infrastructure",
 		}
 	}
 
@@ -58,10 +62,8 @@ type BaseInfo struct {
 
 type Infrastructure struct {
 	client.Resource
-
-	Dashboard *v1alpha1.Infrastructure `json:"dashboard"`
-	Longhorn  *v1alpha1.Infrastructure `json:"longhorn"`
-	Host      string                   `json:"host"`
+	Infra *v1alpha1.Infrastructure `json:"infrastructure"`
+	Host  string                   `json:"host"`
 }
 
 type Cluster struct {
@@ -102,10 +104,9 @@ func NewSchema() *client.Schemas {
 
 	nodeSchema(schemas.AddType("node", Node{}))
 	clusterSchema(schemas.AddType("cluster", Cluster{}))
-	configMapSchema(schemas.AddType(GetSchemaType().Configmap, ConfigMap{}))
-	dashboardSchema(schemas.AddType(GetSchemaType().Dashboard, Infrastructure{}))
-	longhornSchema(schemas.AddType(GetSchemaType().Longhorn, Infrastructure{}))
+
 	baseInfoschema(schemas.AddType(GetSchemaType().BaseInfo, BaseInfo{}))
+	infraSchema(schemas.AddType(GetSchemaType().Infrastructure, Infrastructure{}))
 	return schemas
 }
 
@@ -133,57 +134,41 @@ func nodeSchema(node *client.Schema) {
 	}
 }
 
-func configMapSchema(cm *client.Schema) {
-	cm.CollectionMethods = []string{"GET"}
-	cm.ResourceMethods = []string{"GET"}
-
-	cm.ResourceFields[GetSchemaType().Configmap] = client.Field{
-		Type:     "struct",
-		Nullable: true,
-	}
-}
-
 func baseInfoschema(cm *client.Schema) {
 	cm.CollectionMethods = []string{"GET"}
 	cm.ResourceMethods = []string{"GET"}
 
-	cm.ResourceFields[GetSchemaType().BaseInfo] = client.Field{
+	cm.ResourceFields["resources"] = client.Field{
 		Type:     "struct",
 		Nullable: true,
 	}
-}
-
-func dashboardSchema(dashboard *client.Schema) {
-	dashboard.CollectionMethods = []string{"GET", "POST"}
-	dashboard.ResourceMethods = []string{"GET", "DELETE"}
-
-	dashboard.ResourceFields[GetSchemaType().Dashboard] = client.Field{
+	cm.ResourceFields["componentStatuses"] = client.Field{
 		Type:     "struct",
 		Nullable: true,
 	}
 
 }
 
-func longhornSchema(longhorn *client.Schema) {
-	longhorn.CollectionMethods = []string{"GET", "POST"}
-	longhorn.ResourceMethods = []string{"GET", "DELETE"}
+func infraSchema(infra *client.Schema) {
+	infra.CollectionMethods = []string{"GET", "POST"}
+	infra.ResourceMethods = []string{"GET", "DELETE"}
 
-	longhorn.ResourceFields[GetSchemaType().Longhorn] = client.Field{
+	infra.ResourceFields["infrastructure"] = client.Field{
 		Type:     "struct",
 		Nullable: true,
 	}
 
 }
 
-func toInfrastructureCollection(list *v1alpha1.InfrastructureList, infraType string) *client.GenericCollection {
+func toInfrastructureCollection(list *v1alpha1.InfrastructureList) *client.GenericCollection {
 	data := []interface{}{}
 	for _, item := range list.Items {
-		data = append(data, toInfrastructureResource(&item, infraType, nil, ""))
+		data = append(data, toInfrastructureResource(&item, nil, ""))
 	}
-	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: infraType}}
+	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: GetSchemaType().Infrastructure}}
 }
 
-func toInfrastructureResource(infra *v1alpha1.Infrastructure, infraType string, service *v1.Service, ip string) *Infrastructure {
+func toInfrastructureResource(infra *v1alpha1.Infrastructure, service *v1.Service, ip string) *Infrastructure {
 	name := infra.GetName()
 	host := ip
 
@@ -197,12 +182,11 @@ func toInfrastructureResource(infra *v1alpha1.Infrastructure, infraType string, 
 	return &Infrastructure{
 		Resource: client.Resource{
 			Id:      string(name),
-			Type:    infraType,
+			Type:    "infrastructure",
 			Actions: map[string]string{},
 		},
-		Dashboard: infra,
-		Longhorn:  infra,
-		Host:      host,
+		Host:  host,
+		Infra: infra,
 	}
 }
 
@@ -230,29 +214,6 @@ func toBaseInfo(baseInfo []map[string]string) *BaseInfo {
 		},
 		BaseInfo: baseInfo,
 	}
-}
-
-func toConfigMapResource(configmap *v1.ConfigMap) *ConfigMap {
-	name := configmap.GetName()
-	if name == "" {
-		return nil
-	}
-	return &ConfigMap{
-		Resource: client.Resource{
-			Id:      string(name),
-			Type:    GetSchemaType().Configmap,
-			Actions: map[string]string{},
-		},
-		ConfigMap: configmap,
-	}
-}
-
-func toConfigMapCollection(configmapList *v1.ConfigMapList) *client.GenericCollection {
-	data := []interface{}{}
-	for _, cm := range configmapList.Items {
-		data = append(data, toConfigMapResource(&cm))
-	}
-	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: GetSchemaType().Configmap}}
 }
 
 func toNodeResource(node *v1.Node) *Node {

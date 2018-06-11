@@ -9,25 +9,71 @@ import (
 )
 
 var (
-	ConfigMapName = "cube-rancher"
-
-	dashboardName      = "dashboardName"
-	dashboardNamespace = "dashboardNamespace"
-	dashboardIcon      = "dashboardIcon"
-	dashboardDesc      = "dashboardDesc"
-
-	langhornName      = "langhornName"
-	langhornNamespace = "langhornNamespace"
-	langhornIcon      = "langhornIcon"
-	langhornDesc      = "langhornDesc"
-
-	rancherVMName      = "rancherVMName"
-	rancherVMNamespace = "rancherVMNamespace"
-	rancherVMIcon      = "rancherVMIcon"
-	rancherVMDesc      = "rancherVMDesc"
+//dashboardName      = "dashboardName"
+//dashboardNamespace = "dashboardNamespace"
+//dashboardIcon      = "dashboardIcon"
+//dashboardDesc      = "dashboardDesc"
+//
+//longhornName      = "longhornName"
+//longhornNamespace = "longhornNamespace"
+//longhornIcon      = "longhornIcon"
+//longhornDesc      = "longhornDesc"
+//
+//rancherVMName      = "rancherVMName"
+//rancherVMNamespace = "rancherVMNamespace"
+//rancherVMIcon      = "rancherVMIcon"
+//rancherVMDesc      = "rancherVMDesc"
 )
 
+var (
+	ConfigMapName   = "cube-rancher"
+	Infrastructures *infrastructures
+)
+
+type infrastructure struct {
+	name      string
+	namespace string
+	icon      string
+	desc      string
+}
+
+type infrastructures struct {
+	dashboard *infrastructure
+	longhorn  *infrastructure
+	rancherVM *infrastructure
+}
+
+func initInfrastructures() {
+	dashboard := &infrastructure{
+		name:      "dashboardName",
+		namespace: "dashboardNamespace",
+		icon:      "dashboardIcon",
+		desc:      "dashboardDesc",
+	}
+
+	longhorn := &infrastructure{
+		name:      "longhornName",
+		namespace: "longhornNamespace",
+		icon:      "longhornIcon",
+		desc:      "longhornDesc",
+	}
+
+	rancherVM := &infrastructure{
+		name:      "rancherVMName",
+		namespace: "rancherVMNamespace",
+		icon:      "rancherVMIcon",
+		desc:      "rancherVMDesc",
+	}
+
+	Infrastructures = &infrastructures{
+		dashboard: dashboard,
+		longhorn:  longhorn,
+		rancherVM: rancherVM,
+	}
+}
+
 func (c *ClientGenerator) ConfigMapDeploy() (*v1.ConfigMap, error) {
+	initInfrastructures()
 	configMap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ConfigMapName,
@@ -37,20 +83,21 @@ func (c *ClientGenerator) ConfigMapDeploy() (*v1.ConfigMap, error) {
 			}},
 
 		Data: map[string]string{
-			dashboardName:      controller.DashboardName,
-			dashboardNamespace: controller.DashboardNamespace,
-			dashboardIcon:      "https://avatars3.githubusercontent.com/u/13629408?s=200&v=4",
-			dashboardDesc:      controller.DashboardDesc,
 
-			langhornName:      controller.LonghornName,
-			langhornNamespace: controller.LonghornNamespace,
-			langhornIcon:      "",
-			langhornDesc:      controller.LanghornDesc,
+			Infrastructures.dashboard.name:      controller.DashboardName,
+			Infrastructures.dashboard.namespace: controller.DashboardNamespace,
+			Infrastructures.dashboard.icon:      "https://avatars3.githubusercontent.com/u/13629408?s=200&v=4",
+			Infrastructures.dashboard.desc:      controller.DashboardDesc,
 
-			rancherVMName:      controller.RancherVMName,
-			rancherVMNamespace: controller.RancherVMNamespace,
-			rancherVMIcon:      "",
-			rancherVMDesc:      controller.RancherVMDesc,
+			Infrastructures.longhorn.name:      controller.LonghornName,
+			Infrastructures.longhorn.namespace: controller.LonghornNamespace,
+			Infrastructures.longhorn.icon:      "",
+			Infrastructures.longhorn.desc:      controller.LanghornDesc,
+
+			Infrastructures.rancherVM.name:      controller.RancherVMName,
+			Infrastructures.rancherVM.namespace: controller.RancherVMNamespace,
+			Infrastructures.rancherVM.icon:      "",
+			Infrastructures.rancherVM.desc:      controller.RancherVMDesc,
 		},
 	}
 

@@ -3,10 +3,14 @@ package backend
 import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/cnrancher/cube-apiserver/k8s/pkg/apis/cube/v1alpha1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//"github.com/cnrancher/cube-apiserver/k8s/pkg/apis/cube/v1alpha1"
+	//
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+)
+
+var (
+	lhReplicas int32 = 1
 )
 
 const (
@@ -146,75 +150,59 @@ func (c *ClientGenerator) LonghornEngineCRDDeploy() error {
 	}
 	return err
 }
-
-var (
-	lhReplicas int32 = 1
-)
-
-func (c *ClientGenerator) LonghornList() (*v1alpha1.InfrastructureList, error) {
-	info, err := getConfigMapInfo(c)
-	if err != nil {
-		return nil, err
-	}
-	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).List(metav1.ListOptions{})
-}
-
-func (c *ClientGenerator) LonghornGet() (*v1alpha1.Infrastructure, error) {
-	info, err := getConfigMapInfo(c)
-	if err != nil {
-		return nil, err
-	}
-	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Get(info.Data[langhornName], metav1.GetOptions{})
-
-}
-
-func (c *ClientGenerator) LonghornDeploy() (*v1alpha1.Infrastructure, error) {
-	info, err := getConfigMapInfo(c)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ensureNamespaceExists(c, info.Data[langhornNamespace])
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
-		return nil, err
-	}
-
-	// generate & deploy ingress resources for visit
-	//err = c.LonghornIngressDeploy()
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	lh, err := c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Create(&v1alpha1.Infrastructure{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      info.Data[langhornName],
-			Namespace: info.Data[langhornNamespace],
-		},
-		Spec: v1alpha1.InfraSpec{
-			DisplayName: info.Data[langhornName],
-			Description: info.Data[langhornDesc],
-			Icon:        info.Data[langhornIcon],
-			InfraKind:   "Longhorn",
-			Replicas:    &lhReplicas,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	//watcher, err := c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Watch(metav1.ListOptions{})
-	//if err != nil {
-	//	return nil, err
-	//}
-	//loop(watcher, lh)
-
-	return lh, nil
-}
-
-func (c *ClientGenerator) LonghornDelete() error {
-	info, err := getConfigMapInfo(c)
-	if err != nil {
-		return err
-	}
-	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Delete(info.Data[langhornName], &metav1.DeleteOptions{})
-}
+//
+//func (c *ClientGenerator) LonghornList() (*v1alpha1.InfrastructureList, error) {
+//	info, err := getConfigMapInfo(c)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).List(metav1.ListOptions{})
+//}
+//
+//func (c *ClientGenerator) LonghornGet() (*v1alpha1.Infrastructure, error) {
+//	info, err := getConfigMapInfo(c)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Get(info.Data[langhornName], metav1.GetOptions{})
+//
+//}
+//
+//func (c *ClientGenerator) LonghornDeploy() (*v1alpha1.Infrastructure, error) {
+//	info, err := getConfigMapInfo(c)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	err = ensureNamespaceExists(c, info.Data[langhornNamespace])
+//	if err != nil && !k8serrors.IsAlreadyExists(err) {
+//		return nil, err
+//	}
+//
+//	lh, err := c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Create(&v1alpha1.Infrastructure{
+//		ObjectMeta: metav1.ObjectMeta{
+//			Name:      info.Data[langhornName],
+//			Namespace: info.Data[langhornNamespace],
+//		},
+//		Spec: v1alpha1.InfraSpec{
+//			DisplayName: info.Data[langhornName],
+//			Description: info.Data[langhornDesc],
+//			Icon:        info.Data[langhornIcon],
+//			InfraKind:   "Longhorn",
+//			Replicas:    &lhReplicas,
+//		},
+//	})
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return lh, nil
+//}
+//
+//func (c *ClientGenerator) LonghornDelete() error {
+//	info, err := getConfigMapInfo(c)
+//	if err != nil {
+//		return err
+//	}
+//	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[langhornNamespace]).Delete(info.Data[langhornName], &metav1.DeleteOptions{})
+//}
