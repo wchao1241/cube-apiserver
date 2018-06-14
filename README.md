@@ -5,7 +5,7 @@ API server for RancherCUBE.
 
 ## Prepare
 
-Generate JWT RS256 key to `/etc/rancher/cube`
+Generate JWT RSA256 key to `/etc/rancher/cube`
 
 ```
 mkdir -p /etc/rancher/cube && cd /etc/rancher/cube
