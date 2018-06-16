@@ -22,8 +22,8 @@ import (
 
 const (
 	UserPropertyName = "CUBE-USER-PROPERTY"
-	PrivateKeyPath   = "/etc/rancher/cube/id_rsa"
-	PublicKeyPath    = "/etc/rancher/cube/id_rsa.pub"
+	PrivateKeyPath   = "/var/lib/rancher/cube/id_rsa"
+	PublicKeyPath    = "/var/lib/rancher/cube/id_rsa.pub"
 )
 
 var (

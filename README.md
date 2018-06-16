@@ -5,10 +5,10 @@ API server for RancherCUBE.
 
 ## Prepare
 
-Generate JWT RSA256 key to `/etc/rancher/cube`
+Generate JWT RSA256 key to `/var/lib/rancher/cube`
 
 ```
-mkdir -p /etc/rancher/cube && cd /etc/rancher/cube
+mkdir -p /var/lib/rancher/cube && cd /var/lib/rancher/cube
 
 ssh-keygen -t rsa -b 4096 -f id_rsa
 
