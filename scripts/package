@@ -10,7 +10,7 @@ SUFFIX=""
 cd $(dirname $0)/../package
 
 TAG=${TAG:-${VERSION}${SUFFIX}}
-REPO=${REPO:-rancher}
+REPO=${REPO:-cnrancher}
 
 if echo $TAG | grep -q dirty; then
     TAG=dev
@@ -18,7 +18,7 @@ fi
 
 cp ../bin/rancher-cube-apiserver .
 
-IMAGE=${REPO}/rancher-cube-apiserver:${TAG}
+IMAGE=${REPO}/cube-apiserver:${TAG}
 docker build -t ${IMAGE} .
 echo ${IMAGE} > ../dist/images
 echo Built ${IMAGE}
