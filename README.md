@@ -9,7 +9,7 @@ API server for RancherCUBE.
 
 ## Running
 
-`./bin/rancher-cube-apiserver serve --listen-addr 0.0.0.0:9500`
+`./bin/rancher-cube-apiserver serve --listen-addr 0.0.0.0:9600`
 
 ## License
 Copyright (c) 2018 [Rancher Labs, Inc.](http://rancher.com)
