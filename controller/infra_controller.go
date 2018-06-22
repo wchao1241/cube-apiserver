@@ -754,26 +754,31 @@ func (c *InfraController) createLonghorn(infra *infrav1alpha1.Infrastructure) (*
 	err := c.ensureNamespaceExists(LonghornNamespace)
 	if err == nil || k8serrors.IsAlreadyExists(err) {
 
-		ownerReferences := []metav1.OwnerReference{
-			*metav1.NewControllerRef(infra, schema.GroupVersionKind{
-				Group:   infrav1alpha1.SchemeGroupVersion.Group,
-				Version: infrav1alpha1.SchemeGroupVersion.Version,
-				Kind:    "Infrastructure",
-			}),
-		}
+		//ownerReferences := []metav1.OwnerReference{
+		//	*metav1.NewControllerRef(infra, schema.GroupVersionKind{
+		//		Group:   infrav1alpha1.SchemeGroupVersion.Group,
+		//		Version: infrav1alpha1.SchemeGroupVersion.Version,
+		//		Kind:    "Infrastructure",
+		//	}),
+		//}
 
-		ns, err := c.clientset.CoreV1().Namespaces().Get(LonghornNamespace, metav1.GetOptions{})
-		lnNs := ns.DeepCopy()
-		lnNs.OwnerReferences = ownerReferences
-		c.clientset.CoreV1().Namespaces().Update(lnNs)
+		//ns, err := c.clientset.CoreV1().Namespaces().Get(LonghornNamespace, metav1.GetOptions{})
+		//lnNs := ns.DeepCopy()
+		//lnNs.OwnerReferences = ownerReferences
+		//c.clientset.CoreV1().Namespaces().Update(lnNs)
 
 		// create longhorn serviceAccount
 		_, err = c.clientset.CoreV1().ServiceAccounts(LonghornNamespace).Create(&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "longhorn-service-account",
 				Namespace: LonghornNamespace,
-
-				OwnerReferences: ownerReferences,
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(infra, schema.GroupVersionKind{
+						Group:   infrav1alpha1.SchemeGroupVersion.Group,
+						Version: infrav1alpha1.SchemeGroupVersion.Version,
+						Kind:    "Infrastructure",
+					}),
+				},
 			},
 		})
 		if err != nil && !k8serrors.IsAlreadyExists(err) {

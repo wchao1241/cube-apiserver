@@ -10,7 +10,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,7 +21,7 @@ var (
 
 func (c *ClientGenerator) InfrastructureCRDDeploy() error {
 	crd := &v1beta1.CustomResourceDefinition{
-		ObjectMeta: metaV1.ObjectMeta{Name: "infrastructures.cube.rancher.io"},
+		ObjectMeta: metav1.ObjectMeta{Name: "infrastructures.cube.rancher.io"},
 		Spec: v1beta1.CustomResourceDefinitionSpec{
 			Group:   "cube.rancher.io",
 			Version: "v1alpha1",
@@ -201,6 +200,13 @@ func (c *ClientGenerator) InfrastructureDelete(kind string) error {
 	info, err := getConfigMapInfo(c)
 	if err != nil {
 		return err
+	}
+	//kubectl delete daemonsets -l longhorn=engine-image -n longhorn-system
+	if controller.LonghornName == kind {
+		c.Clientset.ExtensionsV1beta1().DaemonSets(controller.LonghornNamespace).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "longhorn=engine-image",
+		})
+
 	}
 	return c.Infraclientset.CubeV1alpha1().Infrastructures(info.Data[infraInfo.namespace]).Delete(info.Data[infraInfo.name], &metav1.DeleteOptions{})
 }
